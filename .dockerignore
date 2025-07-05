@@ -1,0 +1,16 @@
+# Git管理ファイル
+.git
+.gitignore
+
+# Docker関連
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# ローカル環境の依存関係と成果物
+node_modules
+dist
+
+# 秘密情報とログ
+.env
+npm-debug.log*

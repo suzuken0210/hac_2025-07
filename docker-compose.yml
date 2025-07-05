@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  # サービス名を 'app' とする
+  app:
+    # Dockerfileがある場所を指定してイメージをビルドする
+    build: .
+    # ローカルの.envファイルをコンテナに読み込ませる
+    env_file:
+      - .env
+    # ソースコードの変更を即時反映させるための設定
+    # ローカルのsrcフォルダをコンテナの/app/srcに同期する
+    volumes:
+      - ./src:/app/src
