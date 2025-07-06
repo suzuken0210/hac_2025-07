@@ -5,15 +5,15 @@ import { createMessageImpl, doTask as doReactionRankingMainTask } from "./servic
 
 const {
   SLACK_BOT_TOKEN,
-  SLACK_APP_TOKEN, // Socket Modeに必要
+  SLACK_APP_TOKEN,
   SLACK_REACTION_RANKING_CHANNEL_ID: ReactionRankingChannelId,
   SIGNING_SECRET,
 } = readEnvironment();
 
 const app = new App({
   token: SLACK_BOT_TOKEN,
-  appToken: SLACK_APP_TOKEN, // Socket Modeに必要
-  socketMode: false,
+  appToken: SLACK_APP_TOKEN,
+  socketMode: true, // 本番ではfalseにしてWeb APIを使う
   signingSecret: SIGNING_SECRET,
 })
 
