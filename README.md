@@ -12,6 +12,7 @@ Botの利用には下記の権限の付与が必要なのでそれぞれ設定�
 - channels:history
 - channels:read
 - chat:write
+- users:read
 
 また、投稿先の情報としてchannel idが必要です。
 SLACK_REACTION_RANKING_CHANNEL_IDという名前で環境変数として登録してください。

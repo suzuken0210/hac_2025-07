@@ -1,22 +1,25 @@
+type CalculationReaction = {
+  name: string
+  count: number
+  useUserIdCountMap: Record<string, number> // ユーザーID,使用回数の
+}
+
 type Reaction = {
   name: string
   count: number
-  // TODO: 手が開けばやる
-  // creator: string
+  useUserCountMap: string[] // ユーザ名の配列。リアクションをつけたユーザの名前を格納する
 }
 
-const toReactionFormat = (reaction: Pick<Reaction, "name">): string => {
+const toReactionFormat = (reaction: Record<"name", string>): string => {
   return `:${reaction.name}:`
 }
 
-const compareByCount = (left: Pick<Reaction, "count">, right: Pick<Reaction, "count">): number => {
+const compareByCount = (left: CalculationReaction, right: CalculationReaction): number => {
     return right.count - left.count
 }
 
 export {
   compareByCount, toReactionFormat
 }
-export type {
-  Reaction
-}
+export type { CalculationReaction, Reaction }
 

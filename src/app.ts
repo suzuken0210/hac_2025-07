@@ -1,6 +1,7 @@
 import { App } from "@slack/bolt";
 import { readEnvironment } from "./environment/AppEnvironment";
-import { getAllChannelReactionCounts } from "./repository/ReactionRepository";
+import { getAllChannelReactionCounts } from "./repository/CalculationReactionRepository";
+import { getUserInformation } from "./repository/UserInformationRepository";
 import { createMessageImpl, doTask as doReactionRankingMainTask } from "./services/ReactionRankingService";
 
 const {
@@ -33,12 +34,15 @@ const printMessageImpl = async (text: string): Promise<void> => {
 
 const fetchReactionImpl = () => getAllChannelReactionCounts(app);
 
+const getUserInfoImpl = (userId: string) => getUserInformation(app, userId)
+
 // Run the application
 async function main(): Promise<void> {
   await doReactionRankingMainTask(
     createMessageImpl,
     printMessageImpl,
     fetchReactionImpl,
+    getUserInfoImpl,
   )
 }
 // Execute main function

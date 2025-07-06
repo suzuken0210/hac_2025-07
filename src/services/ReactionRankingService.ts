@@ -1,17 +1,41 @@
-import { compareByCount, Reaction, toReactionFormat } from "../models/reaction"
+import { mapNullable } from "../lib/nullable"
+import { sequentiallyFlatMap, sequentialMap } from "../lib/RichPromise"
+import { CalculationReaction, compareByCount, Reaction, toReactionFormat } from "../models/reaction"
 
 const RankInLimit = 5
+const UserCountLimit = 1
 
 const doTask = async (
     createMessage: (reactionRanking: (Reaction | null)[]) => string,
     printMessage: (text: string) => Promise<void>,
-    fetchReaction: () => Promise<Reaction[]>
+    fetchReaction: () => Promise<CalculationReaction[]>,
+    getUserName: (userId: string) => Promise<string | null>,
 ): Promise<void> => {
-    const reactionList = await fetchReaction()
+    const calculationReactionList = await fetchReaction()
     
-    const rankingReaction: (Reaction | null)[] = calculateReactionRanking(reactionList, RankInLimit)
+    const rankingReaction: (CalculationReaction | null)[] = calculateReactionRanking(calculationReactionList, RankInLimit)
+    const rankingReactionWithUserNames: (Reaction | null)[] = await sequentiallyFlatMap(
+        rankingReaction,
+        async (maybeCalculation) => sequentialMap(
+            maybeCalculation === null ? [null] : [maybeCalculation],
+            async (nullable): Promise<Reaction | null> => nullable === null ? null : ({ 
+                name: nullable.name,
+                count: nullable.count, 
+                useUserCountMap: await sequentiallyFlatMap(
+                    Object.entries(nullable.useUserIdCountMap)
+                        .sort(([, l], [, r]) => r - l)
+                        .slice(0, UserCountLimit),
+                    async ([userId]) => {
+                        const maybeUserName = await getUserName(userId)
 
-    const maybeMessage = createMessage(rankingReaction)
+                        return maybeUserName === null ? [] : [maybeUserName]
+                    }
+                )
+            })
+        )
+    )
+
+    const maybeMessage = createMessage(rankingReactionWithUserNames)
 
     printMessage(maybeMessage)
 }
@@ -23,17 +47,30 @@ const Offset = 1
  * rankInLimitとしてランクイン数を指定し、ランクインしたリアクションをランキング順に返却する
  * ランクインしていない順位はnullで埋める
  */
-const calculateReactionRanking = (reactionList: Reaction[], rankInLimit: number): (Reaction | null)[] => {
-    const aggregatedMap = reactionList.reduce((set: Record<string, number>, reaction) =>
-        ({
-            ...set,
-            [reaction.name]: reaction.count + (set[reaction.name] ?? 0)
-        }), 
-        {}
-    )
-    const aggregatedList = Object.entries(aggregatedMap).map<Reaction>(([name, count]) => ({ name, count }))
+const calculateReactionRanking = (
+    reactionList: CalculationReaction[],
+    rankInLimit: number,
+): (CalculationReaction | null)[] => {
+    const aggregatedMap = reactionList.reduce((set: Record<string, Omit<CalculationReaction, "name">>, reaction) => {
+        const record = set[reaction.name] ?? { count: 0, useUserIdCountMap: {} }
 
-    const sortedByCount = [...aggregatedList].sort(compareByCount)
+        return ({
+            ...set,
+            [reaction.name]: {
+                count: reaction.count + record.count,
+                useUserIdCountMap: Object.entries(reaction.useUserIdCountMap).reduce((acc, [userId, count]) => {
+                    return {
+                        ...acc,
+                        [userId]: (acc[userId] ?? 0) + count
+                    }
+                }, record.useUserIdCountMap)
+            }
+        })
+    }, {})
+    
+    const aggregatedList = Object.entries(aggregatedMap).map<CalculationReaction>(([name, info]) => ({ name, count: info.count, useUserIdCountMap: info.useUserIdCountMap }))
+
+    const sortedByCount: CalculationReaction[] = [...aggregatedList].sort(compareByCount)
 
     const result = sortedByCount.slice(First, rankInLimit)
     
@@ -43,8 +80,10 @@ const calculateReactionRanking = (reactionList: Reaction[], rankInLimit: number)
 const createRankInTemplate = (reaction: Reaction, rankAsIndex: number): string => {
     const rank = rankAsIndex + Offset;
     const formatted = toReactionFormat(reaction);
+    const maybeFanUser = reaction.useUserCountMap[0] ?? null
+    const fanUserText = mapNullable(maybeFanUser, fanUser => `<- ${fanUser}さんが愛用`) ?? "";
 
-    return `${rank}位: ${formatted} (${reaction.count}回)`;
+    return `${rank}位: ${formatted} (${reaction.count}回) ${fanUserText}`;
   }
 
   const createNotRankInTemplate = (_reaction: null, rankAsIndex: number): string => {

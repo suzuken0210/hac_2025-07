@@ -2,7 +2,8 @@ import { App } from "@slack/bolt";
 import { ConversationsHistoryResponse } from "@slack/web-api";
 import { Reaction as RawReaction } from "@slack/web-api/dist/types/response/ConversationsHistoryResponse";
 import { mapNullable, Nullable } from "../lib/nullable";
-import { Reaction } from "../models/reaction";
+import { sequentiallyFlatMap } from "../lib/RichPromise";
+import { CalculationReaction } from "../models/reaction";
 
 interface ChannelInfo {
   id: string;
@@ -89,30 +90,6 @@ async function getChannelHistory(
   }
 }
 
-async function sequentialMap<T, U>(
-  array: T[],
-  asyncFn: (item: T, index: number) => Promise<U>
-): Promise<U[]> {
-  const results: U[] = [];
-  for (let i = 0; i < array.length; i++) {
-    results.push(await asyncFn(array[i], i));
-  }
-  return results;
-}
-
-async function sequentiallyFlatMap<T, U>(
-    array: T[],
-    asyncFn: (item: T, index: number) => Promise<U[]>
-): Promise<U[]> {
-    const results: U[] = [];
-    for (let i = 0; i < array.length; i++) {
-        const items = await asyncFn(array[i], i);
-        results.push(...items);
-    }
-
-    return results;
-}
-
 // Main function to get all channel histories
 async function getAllChannelHistories(app: App): Promise<ConversationsHistoryResponse[]> {
   try {
@@ -136,10 +113,10 @@ async function getAllChannelHistories(app: App): Promise<ConversationsHistoryRes
   }
 }
 
-async function getAllChannelReactionCounts(app: App): Promise<Reaction[]> {
+async function getAllChannelReactionCounts(app: App): Promise<CalculationReaction[]> {
   const historyList = await getAllChannelHistories(app)
   
-  const reactionList: Reaction[] = historyList.flatMap(history => 
+  const reactionList: CalculationReaction[] = historyList.flatMap(history => 
     history.messages?.flatMap(message => {
       const maybeRawReactions = message.reactions ?? null
       
@@ -158,9 +135,11 @@ async function getAllChannelReactionCounts(app: App): Promise<Reaction[]> {
 function extractReactions({ 
   count: rawCount,
   name: rawName,
-}: RawReaction): Nullable<Reaction> {
+  users: rawUsers,
+}: RawReaction): Nullable<CalculationReaction> {
   const maybeCount = rawCount ?? null;
   const maybeName = rawName ?? null;
+  const maybeUserIds = rawUsers ?? null;
 
   if (maybeCount === null || maybeName === null) {
     return null;
@@ -169,9 +148,11 @@ function extractReactions({
   return ({
     count: maybeCount,
     name: maybeName,
+    useUserIdCountMap: Object.fromEntries(maybeUserIds?.map(id => [id, 1]) ?? [])
   });
 }
 
 export {
-    getAllChannelReactionCounts
+  getAllChannelReactionCounts
 };
+
