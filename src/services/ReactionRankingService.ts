@@ -24,7 +24,16 @@ const Offset = 1
  * ランクインしていない順位はnullで埋める
  */
 const calculateReactionRanking = (reactionList: Reaction[], rankInLimit: number): (Reaction | null)[] => {
-    const sortedByCount = [...reactionList].sort(compareByCount)
+    const aggregatedMap = reactionList.reduce((set: Record<string, number>, reaction) =>
+        ({
+            ...set,
+            [reaction.name]: reaction.count + (set[reaction.name] ?? 0)
+        }), 
+        {}
+    )
+    const aggregatedList = Object.entries(aggregatedMap).map<Reaction>(([name, count]) => ({ name, count }))
+
+    const sortedByCount = [...aggregatedList].sort(compareByCount)
 
     const result = sortedByCount.slice(First, rankInLimit)
     
