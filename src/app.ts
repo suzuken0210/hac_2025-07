@@ -1,8 +1,10 @@
 import { App } from "@slack/bolt";
 import { readEnvironment } from "./environment/AppEnvironment";
-import { getAllChannelReactionCounts } from "./repository/CalculationReactionRepository";
+// import { getAllChannelReactionCounts } from "./repository/CalculationReactionRepository";
 import { getUserInformation } from "./repository/UserInformationRepository";
-import { createMessageImpl, doTask as doReactionRankingMainTask } from "./services/ReactionRankingService";
+// import { createMessageImpl, doTask as doReactionRankingMainTask } from "./services/ReactionRankingService";
+import { getAllMessagesFromTimesChannels, getPermalink } from "./repository/MessageRepository";
+import { createMessageImpl as createReplyMessageImpl, doTask as doReplyRankingMainTask } from "./services/ReplyRankingService";
 
 const {
   SLACK_BOT_TOKEN,
@@ -32,17 +34,29 @@ const printMessageImpl = async (text: string): Promise<void> => {
     .catch(error => console.error(error));
 }
 
-const fetchReactionImpl = () => getAllChannelReactionCounts(app);
+// const fetchReactionImpl = () => getAllChannelReactionCounts(app);
 
 const getUserInfoImpl = (userId: string) => getUserInformation(app, userId)
 
+const fetchMessagesImpl = () => getAllMessagesFromTimesChannels(app);
+
+const getPermalinkImpl = (channelId: string, messageTs: string) => getPermalink(app, channelId, messageTs);
+
 // Run the application
 async function main(): Promise<void> {
-  await doReactionRankingMainTask(
-    createMessageImpl,
+  // await doReactionRankingMainTask(
+  //   createMessageImpl,
+  //   printMessageImpl,
+  //   fetchReactionImpl,
+  //   getUserInfoImpl,
+  // )
+
+  await doReplyRankingMainTask(
+    createReplyMessageImpl,
     printMessageImpl,
-    fetchReactionImpl,
+    fetchMessagesImpl,
     getUserInfoImpl,
+    getPermalinkImpl,
   )
 }
 // Execute main function
