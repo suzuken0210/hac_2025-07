@@ -1,7 +1,6 @@
 import { App } from "@slack/bolt";
 import { readEnvironment } from "./environment/AppEnvironment";
-import { getAllChannelReactionCounts } from "./repository/CalculationReactionRepository";
-import { getUserInformation } from "./repository/UserInformationRepository";
+import { getAllChannelReactionCounts } from './repository/CalculationReactionRepository';
 import { createMessageImpl, doTask as doReactionRankingMainTask } from "./services/ReactionRankingService";
 
 const {
@@ -9,14 +8,15 @@ const {
   SLACK_APP_TOKEN,
   SLACK_REACTION_RANKING_CHANNEL_ID: ReactionRankingChannelId,
   SIGNING_SECRET,
+  NODE_ENV = "development",
 } = readEnvironment();
 
 const app = new App({
   token: SLACK_BOT_TOKEN,
   appToken: SLACK_APP_TOKEN,
-  socketMode: true, // 本番ではfalseにしてWeb APIを使う
+  socketMode: NODE_ENV === "development",
   signingSecret: SIGNING_SECRET,
-})
+});
 
 async function publishMessage(app: App, id: string, text: string) {
   return app.client.chat.postMessage({
@@ -34,16 +34,27 @@ const printMessageImpl = async (text: string): Promise<void> => {
 
 const fetchReactionImpl = () => getAllChannelReactionCounts(app);
 
-const getUserInfoImpl = (userId: string) => getUserInformation(app, userId)
+// ユーザー名を取得する関数
+const getUserNameImpl = async (userId: string): Promise<string | null> => {
+  try {
+    const result = await app.client.users.info({
+      user: userId
+    });
+    return result.user?.real_name || result.user?.name || null;
+  } catch (error) {
+    console.error(`Error getting user name for ${userId}:`, error);
+    return null;
+  }
+};
 
-// Run the application
-async function main(): Promise<void> {
+const main = async () => {
+  // ランキング機能のメイン処理を実行
   await doReactionRankingMainTask(
     createMessageImpl,
     printMessageImpl,
     fetchReactionImpl,
-    getUserInfoImpl,
-  )
+    getUserNameImpl,
+  );
 }
-// Execute main function
-main().catch(console.error);
+
+main()

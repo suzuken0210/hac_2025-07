@@ -26,6 +26,7 @@ type EnvironmentVariables = {
     SLACK_APP_TOKEN: string;
     SLACK_REACTION_RANKING_CHANNEL_ID: string;
     SIGNING_SECRET: string;
+    NODE_ENV?: string;
 }
 
 /**
