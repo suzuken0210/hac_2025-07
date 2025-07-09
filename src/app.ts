@@ -108,7 +108,9 @@ cron.schedule('0 10 * * 6', () => {
   await app.start();
   console.log('⚡️ Bolt app is running!');
 
-  // 起動時に既存のリアクションランキングを実行
-  // ※不要な場合はこの行をコメントアウトしてください
+  // 起動時にリアクションランキングを実行
   runReactionRanking();
+
+  // 起動時に投稿ランキングを実行
+  runEngagementRanking();
 })();
