@@ -1,9 +1,49 @@
 import { App } from "@slack/bolt";
 import { ConversationsHistoryResponse } from "@slack/web-api";
 import { Reaction as RawReaction } from "@slack/web-api/dist/types/response/ConversationsHistoryResponse";
+import { Message } from "../models/message";
 import { mapNullable, Nullable } from "../lib/nullable";
 import { sequentiallyFlatMap } from "../lib/RichPromise";
 import { CalculationReaction } from "../models/reaction";
+
+/**
+ * 投稿の盛り上がりランキングのために、1週間分のメッセージを取得します。
+ * スレッドの親投稿のみを対象とします。
+ * @param app - Boltアプリのインスタンス
+ * @returns メッセージオブジェクトの配列
+ */
+export async function getMessagesForEngagementRanking(app: App): Promise<Message[]> {
+  try {
+    console.log('🔍 対象チャンネルのメッセージ履歴を取得開始...');
+    const channels = await getAllChannels(app)
+      .then(channels => channels.filter(c => c.is_member)); // Botが参加しているチャンネルのみ
+
+    console.log(`📊 ${channels.length} チャンネルを対象とします`);
+    
+    // 1週間前のタイムスタンプ
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const oldest = String(Math.floor(oneWeekAgo.getTime() / 1000));
+    
+    const allMessages = await sequentiallyFlatMap(
+      channels,
+      async (channel) => {
+        const history = await getChannelHistory(app, channel.id, channel.name, oldest);
+        // 各メッセージにチャンネルIDを付与して返す
+        return history.flatMap(page => page.messages?.map(m => ({ ...m, channel: channel.id })) ?? []);
+      }
+    );
+    
+    // スレッドの親投稿のみをフィルタリングして返す
+    const parentMessages = allMessages.filter(m => m && (!m.thread_ts || m.ts === m.thread_ts));
+    console.log(`✅ ${parentMessages.length}件の親投稿を取得しました。`);
+    return parentMessages as Message[];
+
+  } catch (error) {
+    console.error('Error in getMessagesForEngagementRanking:', error);
+    return [];
+  }
+}
 
 interface ChannelInfo {
   id: string;
@@ -55,7 +95,8 @@ const giveDelay = <A extends unknown[], B>(
 async function getChannelHistory(
     app: App,
     channelId: string,
-    channelName: string
+    channelName: string,
+    oldest: string // oldestを引数で受け取れるように変更
 ): Promise<ConversationsHistoryResponse[]> {
 
   const go = async (
@@ -79,7 +120,9 @@ async function getChannelHistory(
 
   const fetchChannelHistoryTask = (cursor: string | undefined) => app.client.conversations.history({
     channel: channelId,
-    cursor: cursor
+    cursor: cursor,
+    oldest: oldest, // oldestをAPI呼び出し時に使用
+    limit: 200 // 1回あたりの取得件数
   })
 
   try {
@@ -101,9 +144,14 @@ async function getAllChannelHistories(app: App): Promise<ConversationsHistoryRes
     
     console.log(`📊 Found ${channels.length} channels`);
     
+    // 1週間前のタイムスタンプを oldest として計算
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const oldest = String(Math.floor(oneWeekAgo.getTime() / 1000));
+
     const result = await sequentiallyFlatMap(
         channels,
-        channel => giveDelay(10000, getChannelHistory)(app, channel.id, channel.name)
+        channel => giveDelay(10000, getChannelHistory)(app, channel.id, channel.name, oldest)
     )
 
     return result
