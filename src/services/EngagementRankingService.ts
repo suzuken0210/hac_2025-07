@@ -13,11 +13,11 @@ interface RankedMessage {
 }
 
 // --- メイン処理 ---
-export const doEngagementRankingTask = async (app: App, postChannelId: string) => {
+export const doEngagementRankingTask = async (app: App, postChannelId: string, messages?: Message[]) => {
     console.log("投稿の盛り上がりランキング集計を開始します...");
     try {
-        const messages = await getMessagesForEngagementRanking(app);
-        const scoredMessages = await calculateScores(app.client, messages);
+        const targetMessages = messages || await getMessagesForEngagementRanking(app);
+        const scoredMessages = await calculateScores(app.client, targetMessages);
         const top5Messages = scoredMessages.sort((a, b) => b.score - a.score).slice(0, 5);
 
         await postRanking(app.client, postChannelId, top5Messages);
@@ -59,9 +59,9 @@ async function calculateScores(client: WebClient, messages: Message[]): Promise<
 
         if (totalScore > 0) {
             // --- ユーザー名・チャンネル名・パーマリンクの取得 ---
-            if (!usersCache.has(message.user!)) {
-                const res = await client.users.info({ user: message.user! });
-                if (res.ok) usersCache.set(message.user!, (res.user as any).real_name || (res.user as any).name);
+            if (!!message.user && !usersCache.has(message.user)) {
+                const res = await client.users.info({ user: message.user });
+                if (res.ok) usersCache.set(message.user, (res.user as any).real_name || (res.user as any).name);
             }
             if (!channelsCache.has(message.channel)) {
                 const res = await client.conversations.info({ channel: message.channel });

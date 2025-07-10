@@ -1,9 +1,9 @@
 import { App } from "@slack/bolt";
 import { ConversationsHistoryResponse } from "@slack/web-api";
 import { Reaction as RawReaction } from "@slack/web-api/dist/types/response/ConversationsHistoryResponse";
-import { Message } from "../models/message";
 import { mapNullable, Nullable } from "../lib/nullable";
 import { sequentiallyFlatMap } from "../lib/RichPromise";
+import { Message } from "../models/message";
 import { CalculationReaction } from "../models/reaction";
 
 /**
@@ -13,36 +13,8 @@ import { CalculationReaction } from "../models/reaction";
  * @returns メッセージオブジェクトの配列
  */
 export async function getMessagesForEngagementRanking(app: App): Promise<Message[]> {
-  try {
-    console.log('🔍 対象チャンネルのメッセージ履歴を取得開始...');
-    const channels = await getAllChannels(app)
-      .then(channels => channels.filter(c => c.is_member)); // Botが参加しているチャンネルのみ
-
-    console.log(`📊 ${channels.length} チャンネルを対象とします`);
-    
-    // 1週間前のタイムスタンプ
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const oldest = String(Math.floor(oneWeekAgo.getTime() / 1000));
-    
-    const allMessages = await sequentiallyFlatMap(
-      channels,
-      async (channel) => {
-        const history = await getChannelHistory(app, channel.id, channel.name, oldest);
-        // 各メッセージにチャンネルIDを付与して返す
-        return history.flatMap(page => page.messages?.map(m => ({ ...m, channel: channel.id })) ?? []);
-      }
-    );
-    
-    // スレッドの親投稿のみをフィルタリングして返す
-    const parentMessages = allMessages.filter(m => m && (!m.thread_ts || m.ts === m.thread_ts));
-    console.log(`✅ ${parentMessages.length}件の親投稿を取得しました。`);
-    return parentMessages as Message[];
-
-  } catch (error) {
-    console.error('Error in getMessagesForEngagementRanking:', error);
-    return [];
-  }
+  const data = await getRankingData(app);
+  return data.messages;
 }
 
 interface ChannelInfo {
@@ -134,7 +106,7 @@ async function getChannelHistory(
 }
 
 // Main function to get all channel histories
-async function getAllChannelHistories(app: App): Promise<ConversationsHistoryResponse[]> {
+async function getAllChannelHistories(app: App): Promise<Array<ConversationsHistoryResponse & { channelId: string }>> {
   try {
     console.log('🔍 Fetching all channels...');
     const channels = await getAllChannels(app)
@@ -151,7 +123,11 @@ async function getAllChannelHistories(app: App): Promise<ConversationsHistoryRes
 
     const result = await sequentiallyFlatMap(
         channels,
-        channel => giveDelay(10000, getChannelHistory)(app, channel.id, channel.name, oldest)
+        async channel => {
+          const histories = await giveDelay(10000, getChannelHistory)(app, channel.id, channel.name, oldest);
+          // 各履歴にチャンネルIDを付与
+          return histories.map(history => ({ ...history, channelId: channel.id }));
+        }
     )
 
     return result
@@ -162,22 +138,8 @@ async function getAllChannelHistories(app: App): Promise<ConversationsHistoryRes
 }
 
 async function getAllChannelReactionCounts(app: App): Promise<CalculationReaction[]> {
-  const historyList = await getAllChannelHistories(app)
-  
-  const reactionList: CalculationReaction[] = historyList.flatMap(history => 
-    history.messages?.flatMap(message => {
-      const maybeRawReactions = message.reactions ?? null
-      
-      const maybeReactions = mapNullable(
-        maybeRawReactions, 
-        rawReactions => rawReactions.map(extractReactions).filter(_ => _ !== null)
-      )
-
-      return maybeReactions === null ? [] : maybeReactions
-    }) ?? []
-  )
-
-  return reactionList
+  const data = await getRankingData(app);
+  return data.reactions;
 }
 
 function extractReactions({ 
@@ -198,6 +160,59 @@ function extractReactions({
     name: maybeName,
     useUserIdCountMap: Object.fromEntries(maybeUserIds?.map(id => [id, 1]) ?? [])
   });
+}
+
+// --- 共通データ取得とランキング処理 ---
+export interface RankingData {
+  messages: Message[];
+  reactions: CalculationReaction[];
+}
+
+/**
+ * 両方のランキングに必要なデータを一度に取得する共通関数
+ */
+export async function getRankingData(app: App): Promise<RankingData> {
+  try {
+    console.log('🔍 ランキング用データの取得を開始...');
+    const historyList = await getAllChannelHistories(app);
+    
+    // メッセージデータの抽出（投稿ランキング用）
+    const allMessages = historyList.flatMap(history => 
+      history.messages?.map(m => ({
+        ...m,
+        channel: history.channelId // チャンネルIDを各メッセージに追加
+      })) ?? []
+    );
+    
+    // スレッドの親投稿のみをフィルタリング
+    const parentMessages = allMessages.filter(m => m && (!m.thread_ts || m.ts === m.thread_ts));
+    console.log(`✅ ${parentMessages.length}件の親投稿を取得しました。`);
+    
+    // リアクションデータの抽出（リアクションランキング用）
+    const reactionList: CalculationReaction[] = historyList.flatMap(history => 
+      history.messages?.flatMap(message => {
+        const maybeRawReactions = message.reactions ?? null
+        
+        const maybeReactions = mapNullable(
+          maybeRawReactions, 
+          rawReactions => rawReactions.map(extractReactions).filter(_ => _ !== null)
+        )
+
+        return maybeReactions === null ? [] : maybeReactions
+      }) ?? []
+    );
+    
+    console.log(`✅ ${reactionList.length}件のリアクションデータを取得しました。`);
+    
+    return {
+      messages: parentMessages as Message[],
+      reactions: reactionList
+    };
+    
+  } catch (error) {
+    console.error('Error in getRankingData:', error);
+    return { messages: [], reactions: [] };
+  }
 }
 
 export {
