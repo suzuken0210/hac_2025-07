@@ -1,7 +1,7 @@
 import { App } from "@slack/bolt";
 import { WebClient } from "@slack/web-api";
-import { getMessagesForEngagementRanking } from "../repository/CalculationReactionRepository";
 import { Message } from "../models/message"; // 新しいモデルを定義
+import { getMessagesForEngagementRanking } from "../repository/CalculationReactionRepository";
 
 // --- 型定義 ---
 interface RankedMessage {
