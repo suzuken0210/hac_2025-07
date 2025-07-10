@@ -59,9 +59,9 @@ async function calculateScores(client: WebClient, messages: Message[]): Promise<
 
         if (totalScore > 0) {
             // --- ユーザー名・チャンネル名・パーマリンクの取得 ---
-            if (!usersCache.has(message.user!)) {
-                const res = await client.users.info({ user: message.user! });
-                if (res.ok) usersCache.set(message.user!, (res.user as any).real_name || (res.user as any).name);
+            if (!!message.user && !usersCache.has(message.user)) {
+                const res = await client.users.info({ user: message.user });
+                if (res.ok) usersCache.set(message.user, (res.user as any).real_name || (res.user as any).name);
             }
             if (!channelsCache.has(message.channel)) {
                 const res = await client.conversations.info({ channel: message.channel });
