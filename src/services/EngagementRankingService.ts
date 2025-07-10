@@ -13,11 +13,11 @@ interface RankedMessage {
 }
 
 // --- メイン処理 ---
-export const doEngagementRankingTask = async (app: App, postChannelId: string) => {
+export const doEngagementRankingTask = async (app: App, postChannelId: string, messages?: Message[]) => {
     console.log("投稿の盛り上がりランキング集計を開始します...");
     try {
-        const messages = await getMessagesForEngagementRanking(app);
-        const scoredMessages = await calculateScores(app.client, messages);
+        const targetMessages = messages || await getMessagesForEngagementRanking(app);
+        const scoredMessages = await calculateScores(app.client, targetMessages);
         const top5Messages = scoredMessages.sort((a, b) => b.score - a.score).slice(0, 5);
 
         await postRanking(app.client, postChannelId, top5Messages);

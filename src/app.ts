@@ -1,5 +1,6 @@
 import { App } from "@slack/bolt";
 import { readEnvironment } from "./environment/AppEnvironment";
+import { getRankingData } from './repository/CalculationReactionRepository';
 import { doEngagementRankingTask } from './services/EngagementRankingService';
 import { doReactionRankingTask } from "./services/ReactionRankingService";
 
@@ -48,26 +49,33 @@ const getUserNameImpl = async (userId: string): Promise<string | null> => {
 };
 
 /**
- * 新しい「リアクション使用数」ランキングのメイン処理（ブロックUI対応）
+ * 共通データを取得して両方のランキングを効率的に実行
  */
-const runReactionRanking = async () => {
-    await doReactionRankingTask(app, ReactionRankingChannelId);
-};
-
-/**
- * 新しい「投稿の盛り上がり」ランキングのメイン処理
- */
-const runEngagementRanking = async () => {
-    await doEngagementRankingTask(app, ReactionRankingChannelId);
+const runBothRankings = async () => {
+    console.log("📊 ランキングデータの取得を開始します...");
+    try {
+        // 一度のAPIコールで両方のランキングに必要なデータを取得
+        const rankingData = await getRankingData(app);
+        
+        console.log("🎯 両方のランキングを並行実行します...");
+        
+        // 両方のランキングを並行実行
+        await Promise.all([
+            doReactionRankingTask(app, ReactionRankingChannelId, rankingData.reactions),
+            doEngagementRankingTask(app, ReactionRankingChannelId, rankingData.messages)
+        ]);
+        
+        console.log("✅ 全てのランキング処理が完了しました！");
+        
+    } catch (error) {
+        console.error("ランキング処理中にエラーが発生しました:", error);
+    }
 };
 
 // --- アプリケーションの起動 ---
 (async () => {
   console.log('⚡️ Bolt app is running!');
 
-  // 起動時にリアクションランキングを実行
-  runReactionRanking();
-
-  // 起動時に投稿ランキングを実行
-  runEngagementRanking();
+  // 起動時に両方のランキングを効率的に実行
+  runBothRankings();
 })();

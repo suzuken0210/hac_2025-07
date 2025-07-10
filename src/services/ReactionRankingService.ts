@@ -43,10 +43,10 @@ const doTask = async (
 }
 
 // --- 新しいメイン処理（ブロックUI対応） ---
-export const doReactionRankingTask = async (app: App, postChannelId: string) => {
+export const doReactionRankingTask = async (app: App, postChannelId: string, reactions?: CalculationReaction[]) => {
     console.log("リアクション使用数ランキングの集計を開始します...");
     try {
-        const calculationReactionList = await fetchReaction(app)
+        const calculationReactionList = reactions || await fetchReaction(app)
         
         const rankingReaction: (CalculationReaction | null)[] = calculateReactionRanking(calculationReactionList, RankInLimit)
         const rankingReactionWithUserNames: (Reaction | null)[] = await sequentiallyFlatMap(
