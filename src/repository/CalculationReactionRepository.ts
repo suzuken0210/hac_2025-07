@@ -111,6 +111,7 @@ async function getAllChannelHistories(app: App): Promise<Array<ConversationsHist
     console.log('🔍 Fetching all channels...');
     const channels = await getAllChannels(app)
       .then(_ => _.filter(channel => channel.is_channel && channel.is_member && channel.name))
+      // .then(_ => _.slice(0, 3))
 
     console.log(channels.map(c => c.name));
     

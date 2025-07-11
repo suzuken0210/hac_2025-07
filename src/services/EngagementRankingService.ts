@@ -14,11 +14,18 @@ interface RankedMessage {
 
 // --- メイン処理 ---
 export const doEngagementRankingTask = async (app: App, postChannelId: string, messages?: Message[]) => {
+    console.log({messages})
     console.log("投稿の盛り上がりランキング集計を開始します...");
     try {
         const targetMessages = messages || await getMessagesForEngagementRanking(app);
         const scoredMessages = await calculateScores(app.client, targetMessages);
         const top5Messages = scoredMessages.sort((a, b) => b.score - a.score).slice(0, 5);
+
+        top5Messages.forEach(message => console.log({
+            top5Message: message,
+        }))
+
+        // console.log(top5Messages)
 
         await postRanking(app.client, postChannelId, top5Messages);
         console.log("ランキングの投稿が完了しました。");
@@ -97,16 +104,27 @@ async function postRanking(client: WebClient, channelId: string, ranking: Ranked
             "text": { "type": "plain_text", "text": `🎉 この1週間の盛り上がり投稿ランキング！`, "emoji": true }
         },
         { "type": "divider" },
-        ...ranking.flatMap((item, index) => [
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": `*${index + 1}位* (スコア: ${item.score.toFixed(2)})\n*<${item.link}|「${item.message.text?.slice(0, 80)}...」>*\n:bust_in_silhouette: *${item.user.name}* |  :slack: #${item.channel.name}`
-                }
-            },
-            { "type": "divider" }
-        ])
+        ...ranking.flatMap((item, index) => {
+            // Slack形式のリンクを変換する処理
+            const processedText = (
+                item.message.text
+                    ?.replace(/<([^|>]+)\|([^>]+)>/g, '$2')  // <URL|テキスト> → テキスト
+                    ?.replace(/<([^>]+)>/g, '$1')            // <URL> → URL
+                    ?.slice(0, 80) ?? ""
+        ) + "..."
+                
+            
+            return [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": `*${index + 1}位* (スコア: ${item.score.toFixed(2)})\n${processedText?.split("\n").map(_ => `*<${item.link}|${_}>*`).join("\n")}\n:bust_in_silhouette: *${item.user.name}* |  :slack: #${item.channel.name}`
+                    }
+                },
+                { "type": "divider" }
+            ];
+        })
     ];
 
     await client.chat.postMessage({
