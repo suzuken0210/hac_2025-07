@@ -106,13 +106,14 @@ async function postRanking(client: WebClient, channelId: string, ranking: Ranked
         { "type": "divider" },
         ...ranking.flatMap((item, index) => {
             // Slack形式のリンクを変換する処理
-            const processedText = (
-                item.message.text
-                    ?.replace(/<([^|>]+)\|([^>]+)>/g, '$2')  // <URL|テキスト> → テキスト
-                    ?.replace(/<([^>]+)>/g, '$1')            // <URL> → URL
-                    ?.slice(0, 80) ?? ""
-        ) + "..."
-                
+            const maybeProcessedText = item.message.text
+                ?.replace(/<([^|>]+)\|([^>]+)>/g, '$2')  // <URL|テキスト> → テキスト
+                ?.replace(/<([^>]+)>/g, '$1')            // <URL> → URL
+                ?.slice(0, 80) ?? null
+            
+            const processedText = maybeProcessedText === null 
+                ? "メッセージはありません。リンクから投稿をチェック!!"
+                : maybeProcessedText;
             
             return [
                 {
