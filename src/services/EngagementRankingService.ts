@@ -17,7 +17,7 @@ export const doEngagementRankingTask = async (app: App, postChannelId: string, m
     console.log({messages})
     console.log("投稿の盛り上がりランキング集計を開始します...");
     try {
-        const targetMessages = messages || await getMessagesForEngagementRanking(app);
+        const targetMessages = messages || await getMessagesForEngagementRanking(app, postChannelId);
         const scoredMessages = await calculateScores(app.client, targetMessages);
         const top5Messages = scoredMessages.sort((a, b) => b.score - a.score).slice(0, 5);
 

@@ -2,6 +2,7 @@ import { App } from "@slack/bolt";
 import { readEnvironment } from "./environment/AppEnvironment";
 import { getRankingData } from './repository/CalculationReactionRepository';
 import { doEngagementRankingTask } from './services/EngagementRankingService';
+import { doReactionRankingTask } from "./services/ReactionRankingService";
 
 const {
   SLACK_BOT_TOKEN,
@@ -54,13 +55,13 @@ const runBothRankings = async () => {
     console.log("📊 ランキングデータの取得を開始します...");
     try {
         // 一度のAPIコールで両方のランキングに必要なデータを取得
-        const rankingData = await getRankingData(app);
+        const rankingData = await getRankingData(app, ReactionRankingChannelId);
         
         console.log("🎯 両方のランキングを並行実行します...");
         
         // 両方のランキングを並行実行
         await Promise.all([
-            // doReactionRankingTask(app, ReactionRankingChannelId, rankingData.reactions),
+            doReactionRankingTask(app, ReactionRankingChannelId, rankingData.reactions),
             doEngagementRankingTask(app, ReactionRankingChannelId, rankingData.messages)
         ]);
         
