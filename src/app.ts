@@ -2,7 +2,6 @@ import { App } from "@slack/bolt";
 import { readEnvironment } from "./environment/AppEnvironment";
 import { getRankingData } from './repository/CalculationReactionRepository';
 import { doEngagementRankingTask } from './services/EngagementRankingService';
-import { doReactionRankingTask } from "./services/ReactionRankingService";
 
 const {
   SLACK_BOT_TOKEN,
@@ -61,7 +60,7 @@ const runBothRankings = async () => {
         
         // 両方のランキングを並行実行
         await Promise.all([
-            doReactionRankingTask(app, ReactionRankingChannelId, rankingData.reactions),
+            // doReactionRankingTask(app, ReactionRankingChannelId, rankingData.reactions),
             doEngagementRankingTask(app, ReactionRankingChannelId, rankingData.messages)
         ]);
         
