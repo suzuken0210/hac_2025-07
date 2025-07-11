@@ -46,7 +46,7 @@ const doTask = async (
 export const doReactionRankingTask = async (app: App, postChannelId: string, reactions?: CalculationReaction[]) => {
     console.log("リアクション使用数ランキングの集計を開始します...");
     try {
-        const calculationReactionList = reactions || await fetchReaction(app)
+        const calculationReactionList = reactions || await fetchReaction(app, postChannelId)
         
         const rankingReaction: (CalculationReaction | null)[] = calculateReactionRanking(calculationReactionList, RankInLimit)
         const rankingReactionWithUserNames: (Reaction | null)[] = await sequentiallyFlatMap(
@@ -145,9 +145,9 @@ const createMessageImpl = (reactionRanking: (Reaction | null)[]): string => {
 }
 
 // --- ヘルパー関数 ---
-const fetchReaction = async (app: App): Promise<CalculationReaction[]> => {
+const fetchReaction = async (app: App, channelId: string): Promise<CalculationReaction[]> => {
     const { getAllChannelReactionCounts } = await import('../repository/CalculationReactionRepository');
-    return getAllChannelReactionCounts(app);
+    return getAllChannelReactionCounts(app, channelId);
 }
 
 const getUserName = async (app: App, userId: string): Promise<string | null> => {

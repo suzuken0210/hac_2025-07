@@ -12,8 +12,9 @@ import { CalculationReaction } from "../models/reaction";
  * @param app - Boltアプリのインスタンス
  * @returns メッセージオブジェクトの配列
  */
-export async function getMessagesForEngagementRanking(app: App): Promise<Message[]> {
-  const data = await getRankingData(app);
+export async function getMessagesForEngagementRanking(app: App, channelId: string): Promise<Message[]> {
+  console.log("getMessagesForEngagementRanking called");
+  const data = await getRankingData(app, channelId);
   return data.messages;
 }
 
@@ -32,7 +33,7 @@ const delay = (ms: number) => new Promise<void>(resolve => setTimeout(() => {
         resolve();
     }, ms));
 
-async function getAllChannels(app: App): Promise<ChannelInfo[]> {
+async function getAllChannels(app: App, channelId: string): Promise<ChannelInfo[]> {
   try {
     // Get public channels
     const publicChannels = await app.client.conversations.list({
@@ -48,7 +49,7 @@ async function getAllChannels(app: App): Promise<ChannelInfo[]> {
         is_im: false,
         is_mpim: false,
         is_member: channel.is_member ?? false,
-    })) ?? []
+    }))?.filter(channel => channel.id !== channelId) ?? []
 
     return result;
   } catch (error) {
@@ -106,10 +107,10 @@ async function getChannelHistory(
 }
 
 // Main function to get all channel histories
-async function getAllChannelHistories(app: App): Promise<Array<ConversationsHistoryResponse & { channelId: string }>> {
+async function getAllChannelHistories(app: App, channelId: string): Promise<Array<ConversationsHistoryResponse & { channelId: string }>> {
   try {
     console.log('🔍 Fetching all channels...');
-    const channels = await getAllChannels(app)
+    const channels = await getAllChannels(app, channelId)
       .then(_ => _.filter(channel => channel.is_channel && channel.is_member && channel.name))
       // .then(_ => _.slice(0, 3))
 
@@ -138,8 +139,8 @@ async function getAllChannelHistories(app: App): Promise<Array<ConversationsHist
   }
 }
 
-async function getAllChannelReactionCounts(app: App): Promise<CalculationReaction[]> {
-  const data = await getRankingData(app);
+async function getAllChannelReactionCounts(app: App, channelId: string): Promise<CalculationReaction[]> {
+  const data = await getRankingData(app, channelId);
   return data.reactions;
 }
 
@@ -172,10 +173,10 @@ export interface RankingData {
 /**
  * 両方のランキングに必要なデータを一度に取得する共通関数
  */
-export async function getRankingData(app: App): Promise<RankingData> {
+export async function getRankingData(app: App, channelId: string): Promise<RankingData> {
   try {
     console.log('🔍 ランキング用データの取得を開始...');
-    const historyList = await getAllChannelHistories(app);
+    const historyList = await getAllChannelHistories(app, channelId);
     
     // メッセージデータの抽出（投稿ランキング用）
     const allMessages = historyList.flatMap(history => 
