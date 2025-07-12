@@ -111,9 +111,9 @@ async function postRanking(client: WebClient, channelId: string, ranking: Ranked
                 ?.replace(/<([^>]+)>/g, '$1')            // <URL> → URL
                 ?.slice(0, 80) ?? null
             
-            const processedText = maybeProcessedText
-                ? maybeProcessedText
-                : maybeProcessedText + "..."
+            const processedText = maybeProcessedText?.length === 80
+                ? maybeProcessedText + "..."
+                : maybeProcessedText
             
             return [
                 {
